@@ -1,0 +1,62 @@
+{
+  "pages": [
+    {
+      "path": "/",
+      "name": "homepage",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "waitUntil": "networkidle",
+      "timeout": 60000,
+      "captureOptions": {
+        "fullPage": true,
+        "mobile": false,
+        "darkMode": false
+      }
+    },
+    {
+      "path": "/comparativos",
+      "name": "comparativos",
+      "waitUntil": "networkidle",
+      "timeout": 60000
+    },
+    {
+      "path": "/reviews",
+      "name": "reviews",
+      "waitUntil": "networkidle",
+      "timeout": 60000
+    },
+    {
+      "path": "/guias",
+      "name": "guias",
+      "waitUntil": "networkidle",
+      "timeout": 60000
+    },
+    {
+      "path": "/map",
+      "name": "map",
+      "waitUntil": "load",
+      "timeout": 60000
+    }
+  ],
+  "options": {
+    "parallelPages": 5,
+    "timeout": 60000,
+    "retries": 2,
+    "checks": {
+      "visibility": true,
+      "contrast": true,
+      "brokenImages": true,
+      "lazyLoad": false,
+      "fonts": false,
+      "accessibility": false,
+      "performance": true
+    }
+  },
+  "metadata": {
+    "environment": "production",
+    "branch": "main",
+    "triggeredBy": "manual-test"
+  }
+}

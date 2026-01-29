@@ -1,0 +1,118 @@
+# =============================================================================
+# PATRICIAX - PLAYWRIGHT VISUAL DIAGNOSTICS WORKER
+# =============================================================================
+# Project: Standalone Cloudflare Worker for browser-based visual testing
+# Architecture: Playwright + Durable Objects + R2 + Queue
+# SOTA 2026 Standards Compliant
+# =============================================================================
+
+name = "patriciax"
+main = "src/index.ts"
+compatibility_date = "2026-01-28"
+compatibility_flags = ["nodejs_compat"]
+
+# Smart placement for optimal AI/browser workload distribution
+[placement]
+mode = "smart"
+
+# =============================================================================
+# BROWSER RENDERING API BINDING
+# =============================================================================
+[browser]
+binding = "BROWSER"
+
+# =============================================================================
+# R2 BUCKET - Screenshot & Report Storage
+# =============================================================================
+[[r2_buckets]]
+binding = "DIAGNOSTICS_STORAGE"
+bucket_name = "uniteia-diagnostics"
+
+# =============================================================================
+# KV NAMESPACE - Session Indexing & Cache
+# =============================================================================
+[[kv_namespaces]]
+binding = "DIAGNOSTICS_INDEX"
+id = "44be11c7808940469c438b5618571cbb"
+
+# =============================================================================
+# QUEUE - Async Job Processing
+# =============================================================================
+[[queues.producers]]
+queue = "uniteia-diagnostics-queue"
+binding = "DIAGNOSTICS_QUEUE"
+
+[[queues.consumers]]
+queue = "uniteia-diagnostics-queue"
+max_batch_size = 5
+max_batch_timeout = 60
+max_retries = 3
+dead_letter_queue = "uniteia-diagnostics-dlq"
+
+# =============================================================================
+# DURABLE OBJECTS - Stateful Session Management
+# =============================================================================
+[[durable_objects.bindings]]
+name = "DIAGNOSTIC_SESSION"
+class_name = "DiagnosticSession"
+script_name = "patriciax"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["DiagnosticSession"]
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+[vars]
+ENVIRONMENT = "production"
+VERSION = "1.0.0"
+DEFAULT_TIMEOUT = "60000"
+MAX_CONCURRENT_PAGES = "5"
+LOG_LEVEL = "info"
+
+# =============================================================================
+# STAGING ENVIRONMENT
+# Deploy with: bun run deploy:staging
+# =============================================================================
+[env.staging]
+name = "patriciax-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+VERSION = "1.0.0-staging"
+LOG_LEVEL = "debug"
+
+[[env.staging.r2_buckets]]
+binding = "DIAGNOSTICS_STORAGE"
+bucket_name = "uniteia-diagnostics-staging"
+
+[[env.staging.kv_namespaces]]
+binding = "DIAGNOSTICS_INDEX"
+id = "<REPLACE_WITH_STAGING_ID>"
+
+# =============================================================================
+# PRODUCTION ENVIRONMENT
+# Deploy with: bun run deploy:production
+# =============================================================================
+[env.production]
+name = "patriciax-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+VERSION = "1.0.0"
+LOG_LEVEL = "warn"
+
+# =============================================================================
+# SECRETS (Set via: wrangler secret put <SECRET_NAME>)
+# =============================================================================
+# API_KEY          - Authentication for /run endpoint
+# DATADOG_API_KEY  - (Optional) Metrics integration
+# SENTRY_DSN       - (Optional) Error tracking
