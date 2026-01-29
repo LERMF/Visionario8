@@ -22,7 +22,7 @@ export class PlaywrightAdapter implements BrowserAdapter {
   async launch(): Promise<void> {
     try {
       this.logger.debug('Launching Playwright browser')
-      this.browser = await launch(this.env.BROWSER)
+      this.browser = await launch(this.env.BROWSER as any)
       this.context = await this.browser.newContext({
         viewport: { width: 1920, height: 1080 },
         userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 PatriciaX/1.0 (Cloudflare Workers)',

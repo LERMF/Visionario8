@@ -271,12 +271,12 @@ export class DiagnosticSession {
     const url = new URL(request.url)
 
     if (request.method === 'GET' && url.pathname === '/progress') {
-      const progress = await this.getProgress()
+      const progress = (await this.getProgress()) || null
       return Response.json(progress || { error: 'Session not initialized' })
     }
 
     if (request.method === 'POST' && url.pathname === '/execute') {
-      const diagnosticRequest = await request.json()
+      const diagnosticRequest = (await request.json()) as DiagnosticRequest
       const result = await this.execute(diagnosticRequest)
       return Response.json(result)
     }

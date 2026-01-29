@@ -21,7 +21,7 @@ export class PuppeteerAdapter implements BrowserAdapter {
   async launch(): Promise<void> {
     try {
       this.logger.debug('Launching Puppeteer browser')
-      this.browser = await puppeteer.launch(this.env.BROWSER)
+      this.browser = await puppeteer.launch(this.env.BROWSER as any)
       this.page = await this.browser.newPage()
       await this.page.setViewport({ width: 1920, height: 1080 })
     } catch (error) {
