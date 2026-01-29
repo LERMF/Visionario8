@@ -1,6 +1,6 @@
 /**
  * PatriciaX - Diagnostic Session Durable Object
- * Manages stateful session progress across worker invocations
+ * Manages stateful session progress using modular BrowserExecutor
  */
 
 import type { DurableObject } from 'cloudflare:workers'
@@ -13,7 +13,7 @@ import type {
   SessionState,
 } from '../types'
 import { createLogger } from '../utils/logger'
-import { PlaywrightExecutor } from '../services/playwright-executor'
+import { BrowserExecutor } from '../services/browser-executor'
 import { ScreenshotCapture } from '../services/screenshot-capture'
 import { StorageService } from '../services/storage'
 import { VisibilityDiagnostics } from '../services/visibility-diagnostics'
@@ -54,7 +54,7 @@ export class DiagnosticSession {
         branch: request.metadata?.branch,
         triggeredBy: 'api',
         userAgent: 'PatriciaX/1.0',
-        browserVersion: 'Chromium',
+        browserVersion: 'Dynamic',
         options: request.options || {},
       },
     }
@@ -69,14 +69,16 @@ export class DiagnosticSession {
     await this.initialize(request)
     await this.updateState('capturing')
 
-    const executor = new PlaywrightExecutor(this.env, this.logger)
+    const executor = new BrowserExecutor(this.env, this.logger, 'auto')
     const screenshotService = new ScreenshotCapture(this.logger)
     const diagnosticsService = new VisibilityDiagnostics(this.logger)
     const storageService = new StorageService(this.env, this.logger)
 
     try {
-      // Launch browser
+      // Launch browser (will try Playwright, then Puppeteer)
       await executor.launch()
+      
+      this.progress!.metadata.browserVersion = executor.getEngine()
 
       // Process each page
       for (const pageConfig of request.pages) {
@@ -87,18 +89,20 @@ export class DiagnosticSession {
           pageProgress.startedAt = Date.now()
           await this.saveProgress()
 
-          // Create page and navigate
-          const page = await executor.createPage(pageConfig)
+          // Configure page
+          await executor.configurePage(pageConfig)
+
           const baseUrl = 'https://uniteia.com'
           const url = `${baseUrl}${pageConfig.path}`
 
-          await executor.navigate(page, url, {
+          // Navigate
+          await executor.navigate(url, {
             waitUntil: pageConfig.waitUntil,
             timeout: pageConfig.timeout,
           })
 
           // Capture screenshots
-          const screenshots = await screenshotService.captureAll(page, pageConfig)
+          const screenshots = await screenshotService.captureAll(executor, pageConfig)
 
           // Upload screenshots to R2
           for (const [type, buffer] of screenshots.entries()) {
@@ -121,17 +125,16 @@ export class DiagnosticSession {
 
           // Run diagnostics
           await this.updateState('diagnosing')
-          pageProgress.diagnostics = await diagnosticsService.runDiagnostics(page, pageConfig.path)
+          pageProgress.diagnostics = await diagnosticsService.runDiagnostics(executor, pageConfig.path)
 
           // Get performance metrics
-          pageProgress.performance = await executor.getMetrics(page)
+          pageProgress.performance = await executor.getMetrics()
 
           // Mark page complete
           pageProgress.status = 'completed'
           pageProgress.completedAt = Date.now()
           await this.saveProgress()
 
-          await page.close()
         } catch (error) {
           pageProgress.status = 'failed'
           pageProgress.error = {
@@ -193,7 +196,6 @@ export class DiagnosticSession {
    */
   async getProgress(): Promise<SessionProgress | null> {
     if (!this.progress) {
-      // Try to load from durable storage
       this.progress = await this.state.storage.get<SessionProgress>('progress')
     }
     return this.progress
@@ -268,13 +270,11 @@ export class DiagnosticSession {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
-    // Get current progress
     if (request.method === 'GET' && url.pathname === '/progress') {
       const progress = await this.getProgress()
       return Response.json(progress || { error: 'Session not initialized' })
     }
 
-    // Start execution
     if (request.method === 'POST' && url.pathname === '/execute') {
       const diagnosticRequest = await request.json()
       const result = await this.execute(diagnosticRequest)
